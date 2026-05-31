@@ -9,6 +9,8 @@ const accentStyles = {
     'bg-orange-600 border-orange-700 text-white dark:bg-orange-700 dark:border-orange-600',
   teal:
     'bg-teal-600 border-teal-700 text-white dark:bg-teal-700 dark:border-teal-600',
+  blue:
+    'bg-blue-600 border-blue-700 text-white dark:bg-blue-700 dark:border-blue-600',
 }
 
 export default function CategoryCard({

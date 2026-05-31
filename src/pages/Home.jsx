@@ -96,6 +96,13 @@ export default function Home() {
             totalLabel="topics"
             onClick={() => navigate('/grammar')}
           />
+          <CategoryCard
+            compact
+            accent="blue"
+            title="Voice Practice"
+            subtitle="Record and listen back"
+            onClick={() => navigate('/voice-log')}
+          />
         </div>
       </div>
     </AppShell>

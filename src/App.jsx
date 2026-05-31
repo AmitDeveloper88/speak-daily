@@ -12,6 +12,7 @@ import Favorites from './pages/Favorites'
 import Profile from './pages/Profile'
 import GrammarList from './pages/GrammarList'
 import GrammarDetail from './pages/GrammarDetail'
+import VoiceLog from './pages/VoiceLog'
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="/sentence-builder/:patternId" element={<PatternDetail />} />
         <Route path="/grammar" element={<GrammarList />} />
         <Route path="/grammar/:id" element={<GrammarDetail />} />
+        <Route path="/voice-log" element={<VoiceLog />} />
         <Route path="/progress" element={<Navigate to="/home" replace />} />
         <Route path="/favorites" element={<Favorites />} />
         <Route path="/profile" element={<Profile />} />

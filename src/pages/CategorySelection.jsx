@@ -49,6 +49,12 @@ export default function CategorySelection() {
             totalCount={grammarTopics.length}
             totalLabel="topics"
           />
+          <CategoryCard
+            accent="blue"
+            title="Voice Practice"
+            description="Record your voice and listen back."
+            onClick={() => navigate('/voice-log')}
+          />
         </div>
       </div>
     </AppShell>
