@@ -17,7 +17,7 @@ import {
 } from '../hooks/useSpeechRecognition'
 
 const MAX_SECONDS = 60
-const TRANSCRIPT_DELAY_MS = 450
+const TRANSCRIPT_DELAY_MS = 700
 
 function formatTime(sec) {
   const m = Math.floor(sec / 60)
@@ -245,8 +245,8 @@ export default function SpeakingTask() {
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 {isListening
                   ? mediaUnavailable
-                    ? 'Listening... (allow microphone if asked)'
-                    : 'Listening... speak in English'
+                    ? 'Listening… keep speaking, short pauses are OK'
+                    : 'Listening… keep speaking, short pauses are OK'
                   : 'Tap the mic to start recording'}
               </p>
             </div>

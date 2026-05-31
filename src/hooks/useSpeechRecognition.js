@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-const RESTART_DELAY_MS = 280
 const FATAL_ERRORS = new Set(['not-allowed', 'service-not-allowed', 'audio-capture'])
 
 export function getSpeechRecognitionConstructor() {
@@ -17,39 +16,44 @@ export function isMobileBrowser() {
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 }
 
-function mergeSegments(committed, segment) {
-  const c = (committed || '').trim()
-  const s = (segment || '').trim()
-  if (!s) return c
-  if (!c) return s
-  if (s.startsWith(c)) return s
-  if (c.startsWith(s)) return c
-  if (c.includes(s)) return c
-  if (s.includes(c)) return s
-  return `${c} ${s}`.trim()
+/** chrome | edge | mobile | chromium — drives lang + restart timing */
+export function getSpeechEngineKind() {
+  if (typeof navigator === 'undefined') return 'chromium'
+  const ua = navigator.userAgent
+  if (/Android|iPhone|iPad|iPod/i.test(ua)) return 'mobile'
+  if (/Edg\//.test(ua)) return 'edge'
+  if (/Chrome\//.test(ua) && !/Edg\//.test(ua)) return 'chrome'
+  return 'chromium'
 }
 
-function liveText(final, interim) {
-  const f = (final || '').trim()
-  const i = (interim || '').trim()
+function getEngineConfig(kind) {
+  switch (kind) {
+    case 'chrome':
+      return { lang: 'en-US', restartDelayMs: 300, retryDelayMs: 500 }
+    case 'edge':
+      return { lang: 'en-US', restartDelayMs: 200, retryDelayMs: 400 }
+    case 'mobile':
+      return { lang: 'en-IN', restartDelayMs: 350, retryDelayMs: 600 }
+    default:
+      return { lang: 'en-US', restartDelayMs: 250, retryDelayMs: 500 }
+  }
+}
+
+function liveText(finalText, interimText) {
+  const f = (finalText || '').trim()
+  const i = (interimText || '').trim()
   if (!i) return f
   if (!f) return i
-  if (i.startsWith(f)) return i
   return `${f} ${i}`.trim()
 }
 
-function pickLongestFromResults(results) {
-  if (!results?.length) return ''
-  let best = ''
-  for (let i = 0; i < results.length; i++) {
-    const t = (results[i][0]?.transcript || '').trim()
-    if (t.length > best.length) best = t
-  }
-  return best
+function flushInterimIntoFinal(finalRef, interim) {
+  const piece = (interim || '').trim()
+  if (!piece) return
+  finalRef.current += piece
 }
 
 export function useSpeechRecognition() {
-  const mobile = isMobileBrowser()
   const [isSupported, setIsSupported] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [transcript, setTranscript] = useState('')
@@ -58,10 +62,9 @@ export function useSpeechRecognition() {
   const recognitionRef = useRef(null)
   const shouldRunRef = useRef(false)
   const restartTimerRef = useRef(null)
-  const spawnRef = useRef(() => false)
-
-  const finalPartsRef = useRef('')
-  const committedRef = useRef('')
+  const finalRef = useRef('')
+  const engineKindRef = useRef('chromium')
+  const configRef = useRef(getEngineConfig('chromium'))
 
   const clearRestartTimer = useCallback(() => {
     if (restartTimerRef.current) {
@@ -70,201 +73,192 @@ export function useSpeechRecognition() {
     }
   }, [])
 
-  const teardownRecognition = useCallback(() => {
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.abort()
-      } catch {
-        /* ignore */
-      }
-      recognitionRef.current = null
-    }
+  const syncDisplay = useCallback((interim) => {
+    setTranscript(finalRef.current)
+    setInterimTranscript(interim)
   }, [])
 
-  const requestRestart = useCallback(() => {
+  const scheduleRestart = useCallback((recognition) => {
+    if (!shouldRunRef.current || !recognition) return
     clearRestartTimer()
+    const { restartDelayMs, retryDelayMs } = configRef.current
+
     restartTimerRef.current = setTimeout(() => {
-      if (shouldRunRef.current) spawnRef.current()
-    }, RESTART_DELAY_MS)
+      if (!shouldRunRef.current) return
+      try {
+        recognition.start()
+        setIsListening(true)
+      } catch {
+        restartTimerRef.current = setTimeout(() => {
+          if (!shouldRunRef.current) return
+          try {
+            recognition.start()
+            setIsListening(true)
+          } catch {
+            /* wait for next onend */
+          }
+        }, retryDelayMs)
+      }
+    }, restartDelayMs)
   }, [clearRestartTimer])
 
-  const spawnRecognition = useCallback(() => {
-    const SpeechRecognition = getSpeechRecognitionConstructor()
-    if (!SpeechRecognition || !shouldRunRef.current) return false
-
-    teardownRecognition()
-
-    const recognition = new SpeechRecognition()
-    recognition.lang = mobile ? 'en-US' : 'en-IN'
-    recognition.interimResults = true
-    recognition.continuous = true
-    recognition.maxAlternatives = 1
-
-    if (mobile) {
-      recognition.onresult = (event) => {
-        const sessionText = pickLongestFromResults(event.results)
-        let interim = ''
-        for (let i = event.results.length - 1; i >= 0; i--) {
-          if (!event.results[i].isFinal) {
-            interim = event.results[i][0].transcript
-            break
-          }
-        }
-        const merged = mergeSegments(committedRef.current, sessionText)
-        setTranscript(merged)
-        setInterimTranscript(interim.trim())
-      }
-
-      recognition.onend = () => {
-        recognitionRef.current = null
-
-        setTranscript((prev) => {
-          const merged = mergeSegments(committedRef.current, prev)
-          committedRef.current = merged
-          return merged
-        })
-        setInterimTranscript('')
-
-        if (!shouldRunRef.current) {
-          setIsListening(false)
-          return
-        }
-
-        requestRestart()
-      }
-    } else {
+  const bindRecognition = useCallback(
+    (recognition) => {
       recognition.onresult = (event) => {
         let interim = ''
-        let finalText = finalPartsRef.current
-
         for (let i = event.resultIndex; i < event.results.length; i++) {
-          const piece = event.results[i][0].transcript
-          if (event.results[i].isFinal) {
-            finalText += piece
+          const result = event.results[i]
+          const piece = result[0]?.transcript || ''
+          if (!piece) continue
+          if (result.isFinal) {
+            finalRef.current += piece
           } else {
             interim += piece
           }
         }
-
-        finalPartsRef.current = finalText
-        setTranscript(finalText.trim())
-        setInterimTranscript(interim.trim())
+        syncDisplay(interim.trim())
       }
 
       recognition.onend = () => {
-        recognitionRef.current = null
-        setInterimTranscript((interim) => {
-          if (interim) {
-            const merged = `${finalPartsRef.current} ${interim}`.trim()
-            finalPartsRef.current = merged
-            setTranscript(merged)
-          }
-          return ''
-        })
         if (!shouldRunRef.current) {
           setIsListening(false)
+          return
         }
+        scheduleRestart(recognition)
       }
-    }
 
-    recognition.onerror = (event) => {
-      const code = event?.error
-      if (code === 'no-speech' || code === 'aborted') return
-      if (FATAL_ERRORS.has(code)) {
-        shouldRunRef.current = false
-        setIsListening(false)
-        return
+      recognition.onerror = (event) => {
+        const code = event?.error
+        if (code === 'no-speech' || code === 'aborted') {
+          if (shouldRunRef.current) scheduleRestart(recognition)
+          return
+        }
+        if (FATAL_ERRORS.has(code)) {
+          shouldRunRef.current = false
+          setIsListening(false)
+          return
+        }
+        if (shouldRunRef.current) scheduleRestart(recognition)
       }
-      if (mobile && shouldRunRef.current) {
-        requestRestart()
-      } else if (!mobile) {
-        setIsListening(false)
-      }
-    }
+    },
+    [scheduleRestart, syncDisplay],
+  )
 
-    try {
-      recognition.start()
-      recognitionRef.current = recognition
-      setIsListening(true)
-      return true
-    } catch {
-      if (shouldRunRef.current && mobile) {
-        requestRestart()
-        return true
-      }
-      shouldRunRef.current = false
-      setIsListening(false)
-      return false
-    }
-  }, [mobile, requestRestart, teardownRecognition])
+  const createRecognition = useCallback(() => {
+    const SpeechRecognition = getSpeechRecognitionConstructor()
+    if (!SpeechRecognition) return null
 
-  spawnRef.current = spawnRecognition
+    engineKindRef.current = getSpeechEngineKind()
+    configRef.current = getEngineConfig(engineKindRef.current)
+
+    const recognition = new SpeechRecognition()
+    recognition.continuous = true
+    recognition.interimResults = true
+    recognition.lang = configRef.current.lang
+    recognition.maxAlternatives = 1
+    bindRecognition(recognition)
+    return recognition
+  }, [bindRecognition])
 
   useEffect(() => {
     setIsSupported(isSpeechRecognitionSupported())
     return () => {
       shouldRunRef.current = false
       clearRestartTimer()
-      teardownRecognition()
+      const rec = recognitionRef.current
+      if (rec) {
+        try {
+          rec.abort()
+        } catch {
+          /* ignore */
+        }
+      }
+      recognitionRef.current = null
     }
-  }, [clearRestartTimer, teardownRecognition])
+  }, [clearRestartTimer])
 
   const reset = useCallback(() => {
     shouldRunRef.current = false
     clearRestartTimer()
-    teardownRecognition()
-    finalPartsRef.current = ''
-    committedRef.current = ''
+    const rec = recognitionRef.current
+    if (rec) {
+      try {
+        rec.abort()
+      } catch {
+        /* ignore */
+      }
+    }
+    recognitionRef.current = null
+    finalRef.current = ''
     setTranscript('')
     setInterimTranscript('')
     setIsListening(false)
-  }, [clearRestartTimer, teardownRecognition])
+  }, [clearRestartTimer])
 
   const start = useCallback(() => {
     if (!getSpeechRecognitionConstructor()) return false
 
     shouldRunRef.current = true
-    finalPartsRef.current = ''
-    committedRef.current = ''
+    finalRef.current = ''
     setTranscript('')
     setInterimTranscript('')
     clearRestartTimer()
-    return spawnRecognition()
-  }, [clearRestartTimer, spawnRecognition])
+
+    let recognition = recognitionRef.current
+    if (!recognition) {
+      recognition = createRecognition()
+      if (!recognition) return false
+      recognitionRef.current = recognition
+    }
+
+    try {
+      recognition.start()
+      setIsListening(true)
+      return true
+    } catch {
+      recognitionRef.current = null
+      recognition = createRecognition()
+      if (!recognition) return false
+      recognitionRef.current = recognition
+      const { retryDelayMs } = configRef.current
+      restartTimerRef.current = setTimeout(() => {
+        if (!shouldRunRef.current) return
+        try {
+          recognition.start()
+          setIsListening(true)
+        } catch {
+          shouldRunRef.current = false
+          setIsListening(false)
+        }
+      }, retryDelayMs)
+      return true
+    }
+  }, [clearRestartTimer, createRecognition])
 
   const stop = useCallback(() => {
     shouldRunRef.current = false
     clearRestartTimer()
 
-    if (mobile) {
-      setTranscript((prev) => {
-        const merged = mergeSegments(committedRef.current, prev)
-        committedRef.current = merged
-        return merged
-      })
-      setInterimTranscript('')
-    } else {
-      setInterimTranscript((interim) => {
-        if (interim) {
-          const merged = `${finalPartsRef.current} ${interim}`.trim()
-          finalPartsRef.current = merged
-          setTranscript(merged)
-        }
-        return ''
-      })
-    }
+    setInterimTranscript((interim) => {
+      flushInterimIntoFinal(finalRef, interim)
+      setTranscript(finalRef.current.trim())
+      return ''
+    })
 
     const recognition = recognitionRef.current
     if (recognition) {
       try {
         recognition.stop()
       } catch {
-        recognition.abort()
+        try {
+          recognition.abort()
+        } catch {
+          /* ignore */
+        }
       }
-      recognitionRef.current = null
     }
     setIsListening(false)
-  }, [clearRestartTimer, mobile])
+  }, [clearRestartTimer])
 
   return {
     isSupported,
