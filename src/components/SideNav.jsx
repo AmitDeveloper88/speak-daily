@@ -9,8 +9,8 @@ export default function SideNav() {
       aria-label="Main navigation"
     >
       <div className="border-b border-gray-100 px-5 py-5 dark:border-gray-800">
-        <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{APP_NAME}</p>
-        <p className="mt-0.5 text-xs leading-snug text-gray-500 dark:text-gray-400">
+        <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{APP_NAME}</p>
+        <p className="mt-1 text-sm leading-snug text-gray-500 dark:text-gray-400">
           {APP_TAGLINE}
         </p>
       </div>
@@ -20,7 +20,7 @@ export default function SideNav() {
             key={to}
             to={to}
             className={({ isActive }) =>
-              `flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${
+              `flex items-center gap-3 rounded-xl px-3 py-3 text-base font-medium transition ${
                 isActive
                   ? 'bg-blue-50 text-primary dark:bg-blue-950/60'
                   : 'text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-gray-800'

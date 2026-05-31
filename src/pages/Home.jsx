@@ -31,8 +31,8 @@ export default function Home() {
     <AppShell>
       <div className="px-4 pt-4 pb-2">
         <div className="mb-4">
-          <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100">{APP_NAME}</h1>
-          <p className="text-gray-600 text-sm mt-0.5 dark:text-gray-400">{APP_TAGLINE}</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">{APP_NAME}</h1>
+          <p className="mt-1 text-base text-gray-600 dark:text-gray-400">{APP_TAGLINE}</p>
         </div>
 
         <YourPracticeCard
@@ -48,15 +48,17 @@ export default function Home() {
             onClick={() => navigate(`/topic/${continueTopic.id}`)}
             className="w-full mt-4 p-4 bg-white rounded-2xl shadow-sm border border-gray-100 text-left active:scale-[0.99] transition dark:bg-gray-800 dark:border-gray-700"
           >
-            <p className="text-xs font-semibold text-primary uppercase tracking-wide">
+            <p className="text-sm font-semibold uppercase tracking-wide text-primary">
               Continue Learning
             </p>
-            <p className="font-bold text-gray-900 mt-1 dark:text-gray-100">{continueTopic.title}</p>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Pick up where you left off</p>
+            <p className="mt-1 text-lg font-bold text-gray-900 dark:text-gray-100">
+              {continueTopic.title}
+            </p>
+            <p className="text-base text-gray-500 dark:text-gray-400">Pick up where you left off</p>
           </button>
         )}
 
-        <h2 className="font-bold text-gray-900 mt-6 mb-3 dark:text-gray-100">Categories</h2>
+        <h2 className="mt-6 mb-3 text-xl font-bold text-gray-900 dark:text-gray-100">Categories</h2>
         <div className="grid grid-cols-2 gap-3">
           <CategoryCard
             compact

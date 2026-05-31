@@ -13,12 +13,12 @@ export default function TopicCard({ topic, onClick, number }) {
         </span>
       )}
       <div className="min-w-0 flex-1">
-        <h3 className="font-semibold text-gray-900 dark:text-gray-100">{topic.title}</h3>
+        <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">{topic.title}</h3>
         {topic.subtitle && (
-          <p className="text-sm text-gray-500 truncate dark:text-gray-400">{topic.subtitle}</p>
+          <p className="truncate text-sm text-gray-500 dark:text-gray-400">{topic.subtitle}</p>
         )}
         {topic.tag && (
-          <span className="mt-1 inline-block rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-800 dark:bg-green-950 dark:text-green-300">
+          <span className="mt-1 inline-block rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-green-800 dark:bg-green-950 dark:text-green-300">
             {topic.tag}
           </span>
         )}

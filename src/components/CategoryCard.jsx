@@ -34,20 +34,20 @@ export default function CategoryCard({
         className={`w-full flex items-center gap-3 rounded-2xl border p-4 text-left shadow-sm active:scale-[0.99] transition ${accentClass}`}
       >
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-bold leading-snug">{title}</h3>
+          <h3 className="text-base font-bold leading-snug">{title}</h3>
           {subtitle && (
-            <p className="mt-1 text-xs leading-snug text-white/85">{subtitle}</p>
+            <p className="mt-1 text-sm leading-snug text-white/90">{subtitle}</p>
           )}
           {totalCount != null && totalLabel && (
-            <p className="mt-2 text-[11px] font-medium text-white/75">
+            <p className="mt-2 text-sm font-medium text-white/80">
               {totalCount} {totalLabel} total
             </p>
           )}
         </div>
         {totalCount != null && (
           <div className="shrink-0 rounded-xl bg-white/15 px-3 py-2 text-center">
-            <p className="text-xl font-bold leading-none">{totalCount}</p>
-            <p className="mt-1 text-[9px] font-semibold uppercase tracking-wide text-white/80">
+            <p className="text-2xl font-bold leading-none">{totalCount}</p>
+            <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-white/85">
               {totalLabel}
             </p>
           </div>
@@ -66,11 +66,11 @@ export default function CategoryCard({
         {number != null && (
           <span className="text-sm font-bold text-gray-400 dark:text-gray-500">{number}.</span>
         )}
-        <span className="text-center text-xs font-semibold leading-snug text-gray-900 dark:text-gray-100">
+        <span className="text-center text-sm font-semibold leading-snug text-gray-900 dark:text-gray-100">
           {title}
         </span>
         {subtitle && (
-          <span className="text-center text-[10px] text-gray-500 dark:text-gray-400">{subtitle}</span>
+          <span className="text-center text-sm text-gray-500 dark:text-gray-400">{subtitle}</span>
         )}
       </button>
     )
@@ -86,12 +86,14 @@ export default function CategoryCard({
       className={`flex w-full items-center gap-4 rounded-2xl border p-4 text-left shadow-sm active:scale-[0.99] transition ${accentClass}`}
     >
       <div className="min-w-0 flex-1">
-        <h3 className={`font-bold ${isAccent ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>
+        <h3
+          className={`text-lg font-bold ${isAccent ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}
+        >
           {title}
         </h3>
         {description && (
           <p
-            className={`mt-0.5 text-sm ${
+            className={`mt-0.5 text-base ${
               isAccent ? 'text-white/85' : 'text-gray-500 dark:text-gray-400'
             }`}
           >
@@ -100,7 +102,7 @@ export default function CategoryCard({
         )}
         {subtitle && !description && (
           <p
-            className={`mt-0.5 text-sm ${
+            className={`mt-0.5 text-base ${
               isAccent ? 'text-white/85' : 'text-gray-500 dark:text-gray-400'
             }`}
           >
@@ -109,8 +111,8 @@ export default function CategoryCard({
         )}
         {totalCount != null && totalLabel && (
           <p
-            className={`mt-1.5 text-xs font-medium ${
-              isAccent ? 'text-white/75' : 'text-primary dark:text-blue-300'
+            className={`mt-1.5 text-sm font-medium ${
+              isAccent ? 'text-white/80' : 'text-primary dark:text-blue-300'
             }`}
           >
             {totalCount} {totalLabel} total
@@ -119,8 +121,8 @@ export default function CategoryCard({
       </div>
       {totalCount != null && isAccent && (
         <div className="shrink-0 rounded-xl bg-white/15 px-3 py-2 text-center text-white">
-          <p className="text-xl font-bold leading-none">{totalCount}</p>
-          <p className="mt-1 text-[9px] font-semibold uppercase tracking-wide text-white/80">
+          <p className="text-2xl font-bold leading-none">{totalCount}</p>
+          <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-white/85">
             {totalLabel}
           </p>
         </div>

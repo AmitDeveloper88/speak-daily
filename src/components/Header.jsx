@@ -28,7 +28,7 @@ export default function Header({
           <ArrowLeft size={22} />
         </button>
       )}
-      <h1 className="min-w-0 flex-1 truncate text-lg font-bold text-gray-900 dark:text-gray-100">
+      <h1 className="min-w-0 flex-1 truncate text-xl font-bold text-gray-900 dark:text-gray-100">
         {title}
       </h1>
       {rightAction && <div className="shrink-0">{rightAction}</div>}

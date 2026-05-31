@@ -46,10 +46,10 @@ export default function GrammarDetail() {
 
         {grammar.useHindi && (
           <div className="bg-green-50 border border-green-100 rounded-2xl p-4 mb-5 dark:bg-green-950/40 dark:border-green-900">
-            <p className="text-xs font-semibold text-green-800 mb-2 dark:text-green-300">
+            <p className="text-base font-semibold text-green-800 mb-2 dark:text-green-300">
               Use / Explanation
             </p>
-            <p className="text-sm text-gray-800 leading-relaxed dark:text-gray-200">
+            <p className="text-base text-gray-800 leading-relaxed dark:text-gray-200">
               {grammar.useHindi}
             </p>
           </div>
@@ -59,7 +59,7 @@ export default function GrammarDetail() {
           <>
             <h2 className="font-bold text-gray-900 mb-3 dark:text-gray-100">Simple Rule</h2>
             <div className="mb-5 rounded-2xl border border-blue-100 bg-white p-4 shadow-sm dark:border-blue-900 dark:bg-gray-800">
-              <p className="text-sm leading-relaxed text-gray-800 dark:text-gray-200">
+              <p className="text-base leading-relaxed text-gray-800 dark:text-gray-200">
                 {grammar.simpleRule}
               </p>
             </div>
@@ -73,7 +73,7 @@ export default function GrammarDetail() {
               {grammar.ruleExamples.map((example, i) => (
                 <li
                   key={i}
-                  className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-800 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200"
+                  className="rounded-xl border border-gray-100 bg-gray-50 px-3 py-2.5 text-base text-gray-800 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-200"
                 >
                   {example}
                 </li>
@@ -91,7 +91,7 @@ export default function GrammarDetail() {
                   key={i}
                   className="flex items-start gap-3 p-3 bg-white rounded-2xl border border-gray-100 shadow-sm dark:bg-gray-800 dark:border-gray-700"
                 >
-                  <span className="text-sm font-bold text-gray-400 w-5 dark:text-gray-500">
+                  <span className="text-base font-bold text-gray-400 w-5 dark:text-gray-500">
                     {i + 1}.
                   </span>
                   <p className="flex-1 text-gray-900 dark:text-gray-100">{sentence}</p>
@@ -154,7 +154,7 @@ export default function GrammarDetail() {
           <>
             <h2 className="font-bold text-gray-900 mb-3 dark:text-gray-100">Speaking Task</h2>
             <div className="mb-5 rounded-2xl border border-blue-100 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/40">
-              <p className="text-sm font-medium leading-relaxed text-gray-900 dark:text-gray-100">
+              <p className="text-base font-medium leading-relaxed text-gray-900 dark:text-gray-100">
                 {grammar.speakingTask}
               </p>
             </div>
@@ -166,7 +166,7 @@ export default function GrammarDetail() {
             <h2 className="font-bold text-gray-900 mb-3 dark:text-gray-100">Model Answer</h2>
             <div className="mb-5 rounded-2xl border border-green-100 bg-green-50 p-4 dark:border-green-900 dark:bg-green-950/40">
               <div className="mb-2 flex items-start justify-between gap-2">
-                <span className="text-xs font-semibold text-green-800 dark:text-green-300">
+                <span className="text-base font-semibold text-green-800 dark:text-green-300">
                   Example
                 </span>
                 <button
@@ -178,7 +178,7 @@ export default function GrammarDetail() {
                   <Volume2 size={18} />
                 </button>
               </div>
-              <p className="text-sm leading-relaxed text-gray-800 dark:text-gray-200">
+              <p className="text-base leading-relaxed text-gray-800 dark:text-gray-200">
                 {grammar.modelAnswer}
               </p>
             </div>
@@ -193,7 +193,7 @@ export default function GrammarDetail() {
                 {grammar.tips.map((tip, i) => (
                   <li
                     key={i}
-                    className="flex gap-2 text-sm leading-relaxed text-gray-800 dark:text-gray-200"
+                    className="flex gap-2 text-base leading-relaxed text-gray-800 dark:text-gray-200"
                   >
                     <span className="font-bold text-orange-600 dark:text-orange-400">•</span>
                     <span>{tip}</span>
@@ -207,7 +207,7 @@ export default function GrammarDetail() {
         <button
           type="button"
           onClick={() => navigate('/grammar')}
-          className="mt-6 w-full py-2 text-center text-sm font-semibold text-primary"
+          className="mt-6 w-full py-2 text-center text-base font-semibold text-primary"
         >
           ← Back to grammar topics
         </button>

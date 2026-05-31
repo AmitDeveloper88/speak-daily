@@ -53,7 +53,7 @@ export default function PatternDetail() {
         <Header title={pattern.title} />
 
         <div className="bg-green-50 border border-green-100 rounded-2xl p-4 mb-5 dark:bg-green-950/40 dark:border-green-900">
-          <p className="text-xs font-semibold text-green-800 mb-2 dark:text-green-300">
+          <p className="text-sm font-semibold text-green-800 mb-2 dark:text-green-300">
             Use / Explanation
           </p>
           <p className="text-sm text-gray-800 leading-relaxed dark:text-gray-200">

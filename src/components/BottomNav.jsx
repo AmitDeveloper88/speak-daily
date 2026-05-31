@@ -13,7 +13,7 @@ export default function BottomNav() {
             key={to}
             to={to}
             className={({ isActive }) =>
-              `flex flex-col items-center gap-0.5 px-3 py-1 text-xs font-medium transition ${
+              `flex flex-col items-center gap-0.5 px-3 py-1.5 text-sm font-medium transition ${
                 isActive ? 'text-primary' : 'text-gray-500 dark:text-gray-400'
               }`
             }

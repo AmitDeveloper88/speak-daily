@@ -59,7 +59,7 @@ export default function Profile() {
                 {voice.name}
               </span>
               {recommended && (
-                <span className="text-xs font-medium text-primary">Recommended</span>
+                <span className="text-sm font-medium text-primary">Recommended</span>
               )}
             </span>
           </button>
@@ -85,7 +85,7 @@ export default function Profile() {
       <div className="px-4 pt-1 pb-6">
         <Header title="Settings" showBack={false} />
 
-        <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
+        <p className="mb-4 text-base text-gray-600 dark:text-gray-400">
           Customize your practice experience.
         </p>
 
@@ -94,19 +94,19 @@ export default function Profile() {
             <p className="text-lg font-bold text-gray-900 dark:text-gray-100">
               {topicsPracticed}/{speakingTopics.length}
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Topics</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Topics</p>
           </div>
           <div className="text-center border-x border-gray-100 dark:border-gray-700">
             <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{favoritesCount}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Favorites</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Favorites</p>
           </div>
           <div className="text-center">
             <p className="text-lg font-bold text-gray-900 dark:text-gray-100">{practiceTime}</p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Practice</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">Practice</p>
           </div>
         </div>
 
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+        <h2 className="mb-2 text-base font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
           Preferences
         </h2>
 
@@ -187,12 +187,12 @@ export default function Profile() {
             {voicePickerOpen && (
               <div className="border-t border-gray-100 bg-gray-50 px-3 py-3 dark:border-gray-700 dark:bg-gray-900/50">
                 {!naturalAvailable && (
-                  <p className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                  <p className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
                     Best quality: open this site in <strong>Microsoft Edge</strong> and choose a voice
                     with &quot;Natural&quot; in the name (e.g. Aria, Jenny).
                   </p>
                 )}
-                <p className="mb-2 px-1 text-xs text-gray-500 dark:text-gray-400">
+                <p className="mb-2 px-1 text-sm text-gray-500 dark:text-gray-400">
                   Tap play to preview. We auto-select the best US English voice on your device.
                 </p>
                 <div className="max-h-72 overflow-y-auto overscroll-contain">
@@ -203,7 +203,7 @@ export default function Profile() {
                   )}
                   {recommendedVoices.length > 0 && (
                     <>
-                      <p className="mb-1 px-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      <p className="mb-1 px-1 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                         Recommended
                       </p>
                       <ul className="mb-3 space-y-1">{recommendedVoices.map(renderVoiceRow)}</ul>
@@ -211,7 +211,7 @@ export default function Profile() {
                   )}
                   {otherVoices.length > 0 && (
                     <>
-                      <p className="mb-1 px-1 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                      <p className="mb-1 px-1 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                         More voices
                       </p>
                       <ul className="space-y-1">{otherVoices.map(renderVoiceRow)}</ul>

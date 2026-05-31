@@ -38,7 +38,7 @@ export default function TopicList() {
             placeholder="Search topics..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/30 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500"
+            className="w-full rounded-2xl border border-gray-200 bg-gray-50 py-3 pr-4 pl-10 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/30 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500"
           />
         </div>
         <div className="flex flex-col gap-3">

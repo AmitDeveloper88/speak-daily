@@ -40,7 +40,7 @@ export default function GrammarList() {
             placeholder="Search grammar topics..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 bg-gray-50 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/30 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500"
+            className="w-full rounded-2xl border border-gray-200 bg-gray-50 py-3 pr-4 pl-10 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/30 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500"
           />
         </div>
 
@@ -61,12 +61,14 @@ export default function GrammarList() {
                   {index + 1}.
                 </span>
                 <div className="min-w-0 flex-1">
-                  <h3 className="font-semibold text-gray-900 dark:text-gray-100">{topic.title}</h3>
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                    {topic.title}
+                  </h3>
                   {topic.subtitle && (
                     <p className="text-sm text-gray-500 truncate dark:text-gray-400">{topic.subtitle}</p>
                   )}
                   {topic.tag && (
-                    <span className="mt-1 inline-block rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-800 dark:bg-green-950 dark:text-green-300">
+                    <span className="mt-1 inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-green-800 dark:bg-green-950 dark:text-green-300">
                       {topic.tag}
                     </span>
                   )}
