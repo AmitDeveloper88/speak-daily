@@ -11,10 +11,8 @@ import {
   addRecentPractice,
   markTopicCompleted,
 } from '../utils/storage'
-import {
-  isMobileBrowser,
-  useSpeechRecognition,
-} from '../hooks/useSpeechRecognition'
+import { useSpeechRecognition } from '../hooks/useSpeechRecognition'
+import { dedupeSpokenText } from '../utils/transcript'
 
 const MAX_SECONDS = 60
 const TRANSCRIPT_DELAY_MS = 450
@@ -30,7 +28,7 @@ function buildTranscriptText(speech) {
   if (!speech.isSupported) {
     return ''
   }
-  return (speech.transcript || speech.liveTranscript || '').trim()
+  return dedupeSpokenText(speech.transcript || speech.liveTranscript || '')
 }
 
 function needsManualTranscript(text) {
@@ -41,7 +39,6 @@ export default function SpeakingTask() {
   const { id } = useParams()
   const navigate = useNavigate()
   const topic = getTopicById(id)
-  const mobile = isMobileBrowser()
 
   const [phase, setPhase] = useState('idle')
   const [seconds, setSeconds] = useState(0)
@@ -109,7 +106,9 @@ export default function SpeakingTask() {
     clearTimer()
     speech.stop()
     if (secondsRef.current > 0) addPracticeTimeSeconds(secondsRef.current)
-    const delay = mobile ? TRANSCRIPT_DELAY_MOBILE_MS : TRANSCRIPT_DELAY_MS
+    const delay = speechRef.current?.isMobileMode
+      ? TRANSCRIPT_DELAY_MOBILE_MS
+      : TRANSCRIPT_DELAY_MS
     setTimeout(finishRecording, delay)
   }
 
@@ -162,7 +161,9 @@ export default function SpeakingTask() {
         ? 'Mic could not catch speech on this phone. Type what you said below.'
         : 'We could not detect your speech. Type what you said below.')
     : isListening
-      ? speech.liveTranscript || 'Listening… speak clearly in English'
+      ? speech.isMobileMode
+        ? 'Recording… speak in English. Tap Stop when finished.'
+        : speech.liveTranscript || 'Listening… speak clearly in English'
       : 'Tap the mic and speak. Your words will show here live.'
 
   return (
@@ -174,7 +175,7 @@ export default function SpeakingTask() {
           <p className="font-medium text-gray-900 dark:text-gray-100">{topic.speakingTask}</p>
         </div>
 
-        {phase === 'idle' && (mobile || !speech.isSupported) && (
+        {phase === 'idle' && (speech.isMobileMode || !speech.isSupported) && (
           <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
             {!speech.isSupported ? (
               <>
