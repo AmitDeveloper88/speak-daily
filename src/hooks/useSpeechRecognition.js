@@ -1,9 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import {
-  dedupeSpokenText,
-  mergeSpeechSegments,
-  pickBestFromResults,
-} from '../utils/transcript'
 
 export function getSpeechRecognitionConstructor() {
   if (typeof window === 'undefined') return null
@@ -19,71 +14,67 @@ export function isMobileBrowser() {
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 }
 
-/** Mobile browsers (esp. Chrome Android) break speech recognition — use timer + type instead. */
-export function useManualPracticeMode() {
-  return isMobileBrowser()
+function pickBestFromResults(results) {
+  if (!results?.length) return ''
+  let best = ''
+  for (let i = 0; i < results.length; i++) {
+    const t = (results[i][0]?.transcript || '').trim()
+    if (t.length > best.length) best = t
+  }
+  return best
 }
 
-function mapSpeechError(event) {
-  const code = event?.error
-  if (code === 'not-allowed' || code === 'service-not-allowed') {
-    return 'Microphone blocked. Allow mic for this site in Chrome settings.'
-  }
-  if (code === 'no-speech' || code === 'aborted') {
-    return ''
-  }
-  if (code === 'network') {
-    return 'Speech recognition needs internet. Check your connection.'
-  }
-  return code ? `Speech error: ${code}` : ''
+function mergeSegments(committed, segment) {
+  const c = (committed || '').trim()
+  const s = (segment || '').trim()
+  if (!s) return c
+  if (!c) return s
+  if (s.startsWith(c)) return s
+  if (c.startsWith(s)) return c
+  if (c.includes(s)) return c
+  if (s.includes(c)) return s
+  return `${c} ${s}`.trim()
+}
+
+function liveText(final, interim) {
+  const f = (final || '').trim()
+  const i = (interim || '').trim()
+  if (!i) return f
+  if (!f) return i
+  if (i.startsWith(f)) return i
+  return `${f} ${i}`.trim()
 }
 
 export function useSpeechRecognition() {
-  const manualPractice = useManualPracticeMode()
   const [isSupported, setIsSupported] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [transcript, setTranscript] = useState('')
   const [interimTranscript, setInterimTranscript] = useState('')
-  const [error, setError] = useState('')
 
   const recognitionRef = useRef(null)
   const sessionActiveRef = useRef(false)
+  const committedRef = useRef('')
+  const restartTimerRef = useRef(null)
 
-  useEffect(() => {
-    setIsSupported(!manualPractice && isSpeechRecognitionSupported())
-    return () => {
-      sessionActiveRef.current = false
-      recognitionRef.current?.abort()
+  const clearRestartTimer = useCallback(() => {
+    if (restartTimerRef.current) {
+      clearTimeout(restartTimerRef.current)
+      restartTimerRef.current = null
     }
-  }, [manualPractice])
-
-  const reset = useCallback(() => {
-    sessionActiveRef.current = false
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.abort()
-      } catch {
-        /* ignore */
-      }
-      recognitionRef.current = null
-    }
-    setTranscript('')
-    setInterimTranscript('')
-    setError('')
-    setIsListening(false)
   }, [])
 
-  const start = useCallback(() => {
-    if (manualPractice) {
-      setIsListening(true)
-      return true
-    }
+  const commitSession = useCallback(() => {
+    setTranscript((prev) => {
+      const merged = mergeSegments(committedRef.current, prev)
+      committedRef.current = merged
+      return merged
+    })
+    setInterimTranscript('')
+  }, [])
 
+  const startRecognitionInstance = useCallback(() => {
     const SpeechRecognition = getSpeechRecognitionConstructor()
-    if (!SpeechRecognition) {
-      setError('Speech-to-text is not available. Type your answer after recording.')
-      return false
-    }
+    if (!SpeechRecognition || !sessionActiveRef.current) return false
 
     if (recognitionRef.current) {
       try {
@@ -94,19 +85,14 @@ export function useSpeechRecognition() {
       recognitionRef.current = null
     }
 
-    sessionActiveRef.current = true
-    setTranscript('')
-    setInterimTranscript('')
-    setError('')
-
     const recognition = new SpeechRecognition()
-    recognition.lang = 'en-US'
+    recognition.lang = isMobileBrowser() ? 'en-US' : 'en-IN'
     recognition.interimResults = true
     recognition.continuous = true
     recognition.maxAlternatives = 1
 
     recognition.onresult = (event) => {
-      const best = pickBestFromResults(event.results)
+      const sessionText = pickBestFromResults(event.results)
       let interim = ''
       for (let i = event.results.length - 1; i >= 0; i--) {
         if (!event.results[i].isFinal) {
@@ -114,20 +100,28 @@ export function useSpeechRecognition() {
           break
         }
       }
-      setTranscript(dedupeSpokenText(best))
+      const merged = mergeSegments(committedRef.current, sessionText)
+      setTranscript(merged)
       setInterimTranscript(interim.trim())
     }
 
-    recognition.onerror = (event) => {
-      const message = mapSpeechError(event)
-      if (message) setError(message)
+    recognition.onerror = () => {
+      if (!sessionActiveRef.current) setIsListening(false)
     }
 
     recognition.onend = () => {
       recognitionRef.current = null
+      commitSession()
+
       if (!sessionActiveRef.current) {
         setIsListening(false)
+        return
       }
+
+      clearRestartTimer()
+      restartTimerRef.current = setTimeout(() => {
+        startRecognitionInstance()
+      }, 350)
     }
 
     try {
@@ -136,24 +130,50 @@ export function useSpeechRecognition() {
       setIsListening(true)
       return true
     } catch {
-      sessionActiveRef.current = false
-      setError('Could not start microphone. Tap the mic again.')
-      setIsListening(false)
       return false
     }
-  }, [manualPractice])
+  }, [clearRestartTimer, commitSession])
+
+  useEffect(() => {
+    setIsSupported(isSpeechRecognitionSupported())
+    return () => {
+      sessionActiveRef.current = false
+      clearRestartTimer()
+      recognitionRef.current?.abort()
+    }
+  }, [clearRestartTimer])
+
+  const reset = useCallback(() => {
+    sessionActiveRef.current = false
+    clearRestartTimer()
+    committedRef.current = ''
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort()
+      } catch {
+        /* ignore */
+      }
+      recognitionRef.current = null
+    }
+    setTranscript('')
+    setInterimTranscript('')
+    setIsListening(false)
+  }, [clearRestartTimer])
+
+  const start = useCallback(() => {
+    if (!getSpeechRecognitionConstructor()) return false
+
+    sessionActiveRef.current = true
+    committedRef.current = ''
+    setTranscript('')
+    setInterimTranscript('')
+    return startRecognitionInstance()
+  }, [startRecognitionInstance])
 
   const stop = useCallback(() => {
-    if (manualPractice) {
-      setIsListening(false)
-      return
-    }
-
     sessionActiveRef.current = false
-    setInterimTranscript((interim) => {
-      setTranscript((prev) => dedupeSpokenText(mergeSpeechSegments(prev, interim)))
-      return ''
-    })
+    clearRestartTimer()
+    commitSession()
 
     const recognition = recognitionRef.current
     if (recognition) {
@@ -165,21 +185,14 @@ export function useSpeechRecognition() {
       recognitionRef.current = null
     }
     setIsListening(false)
-  }, [manualPractice])
-
-  const liveTranscript = dedupeSpokenText(
-    mergeSpeechSegments(transcript, interimTranscript)
-  )
+  }, [clearRestartTimer, commitSession])
 
   return {
-    manualPractice,
-    isSupported: !manualPractice && isSupported,
+    isSupported,
     isListening,
-    isMobileMode: manualPractice,
-    transcript: dedupeSpokenText(transcript),
+    transcript: transcript.trim(),
     interimTranscript,
-    liveTranscript,
-    error: manualPractice ? '' : error,
+    liveTranscript: liveText(transcript, interimTranscript),
     start,
     stop,
     reset,

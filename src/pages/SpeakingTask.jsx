@@ -12,7 +12,6 @@ import {
   markTopicCompleted,
 } from '../utils/storage'
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition'
-import { dedupeSpokenText } from '../utils/transcript'
 
 const MAX_SECONDS = 60
 const TRANSCRIPT_DELAY_MS = 450
@@ -24,10 +23,11 @@ function formatTime(sec) {
 }
 
 function buildTranscriptText(speech) {
-  if (!speech.isSupported || speech.manualPractice) {
-    return ''
+  if (!speech.isSupported) {
+    return 'Speech recognition is not supported in this browser. You can still practice by speaking aloud.'
   }
-  return dedupeSpokenText(speech.transcript || speech.liveTranscript || '')
+  const text = (speech.transcript || speech.liveTranscript || '').trim()
+  return text || 'We could not detect your speech. Please try again.'
 }
 
 export default function SpeakingTask() {
@@ -38,19 +38,20 @@ export default function SpeakingTask() {
   const [phase, setPhase] = useState('idle')
   const [seconds, setSeconds] = useState(0)
   const [finalTranscript, setFinalTranscript] = useState('')
-  const [manualTranscript, setManualTranscript] = useState('')
+  const [mediaUnavailable, setMediaUnavailable] = useState(false)
 
   const timerRef = useRef(null)
   const secondsRef = useRef(0)
+  const mediaRef = useRef(null)
   const speechRef = useRef(null)
 
   const speech = useSpeechRecognition()
   speechRef.current = speech
-  const manualMode = speech.manualPractice
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
+      if (mediaRef.current?.state === 'recording') mediaRef.current.stop()
     }
   }, [])
 
@@ -71,45 +72,30 @@ export default function SpeakingTask() {
     }
   }
 
-  const completePractice = (answerText) => {
-    setFinalTranscript(answerText)
-    setPhase('done')
-    markTopicCompleted(topic.id)
-    addRecentPractice({ id: topic.id, title: topic.title })
+  const stopMediaRecorder = () => {
+    if (mediaRef.current?.state === 'recording') {
+      mediaRef.current.stop()
+    }
+    mediaRef.current = null
   }
 
   const finishRecording = () => {
     const s = speechRef.current
-    const typed = manualTranscript.trim()
-
-    if (manualMode || !s?.isSupported) {
-      completePractice(typed)
-      return
-    }
-
-    const detected = buildTranscriptText(s)
-    if (typed) {
-      completePractice(typed)
-    } else if (detected) {
-      completePractice(detected)
-    } else {
-      setFinalTranscript('')
-      setPhase('done')
-      markTopicCompleted(topic.id)
-      addRecentPractice({ id: topic.id, title: topic.title })
-    }
+    if (!s) return
+    setFinalTranscript(buildTranscriptText(s))
+    setPhase('done')
+    markTopicCompleted(topic.id)
+    addRecentPractice({
+      id: topic.id,
+      title: topic.title,
+    })
   }
 
   const handleStop = () => {
     clearTimer()
+    stopMediaRecorder()
     speech.stop()
     if (secondsRef.current > 0) addPracticeTimeSeconds(secondsRef.current)
-
-    if (manualMode) {
-      finishRecording()
-      return
-    }
-
     setTimeout(finishRecording, TRANSCRIPT_DELAY_MS)
   }
 
@@ -126,44 +112,53 @@ export default function SpeakingTask() {
     }, 1000)
   }
 
+  const startMediaRecorder = () => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMediaUnavailable(true)
+      return
+    }
+    navigator.mediaDevices
+      .getUserMedia({ audio: true })
+      .then((stream) => {
+        const recorder = new MediaRecorder(stream)
+        recorder.onstop = () => stream.getTracks().forEach((t) => t.stop())
+        mediaRef.current = recorder
+        recorder.start()
+        setMediaUnavailable(false)
+      })
+      .catch(() => {
+        setMediaUnavailable(true)
+      })
+  }
+
   const handleStart = () => {
     setFinalTranscript('')
-    setManualTranscript('')
     setPhase('listening')
     speech.start()
     startTimer()
+    startMediaRecorder()
   }
 
   const handleTryAgain = () => {
     clearTimer()
+    stopMediaRecorder()
     speech.reset()
     secondsRef.current = 0
     setSeconds(0)
     setFinalTranscript('')
-    setManualTranscript('')
     setPhase('idle')
-  }
-
-  const handleSaveManual = () => {
-    const text = manualTranscript.trim()
-    if (!text) return
-    completePractice(text)
+    setMediaUnavailable(false)
   }
 
   const isListening = phase === 'listening'
   const isDone = phase === 'done'
-  const showTypeBox = isDone && (manualMode || !finalTranscript)
-  const showAnswer = isDone && finalTranscript && !showTypeBox
 
   const youSaidText = isDone
     ? finalTranscript
     : isListening
-      ? manualMode
-        ? 'Speak aloud in English. Timer is running — type your answer after Stop.'
-        : speech.liveTranscript || 'Listening… speak clearly in English'
-      : manualMode
-        ? 'Tap mic to start the timer. Speak, then type what you said.'
-        : 'Tap the mic and speak. Your words will show here live.'
+      ? speech.liveTranscript || 'Listening... start speaking'
+      : finalTranscript ||
+        'Tap the mic and speak. Your words will show here live.'
 
   return (
     <AppShell showNav={false}>
@@ -174,23 +169,10 @@ export default function SpeakingTask() {
           <p className="font-medium text-gray-900 dark:text-gray-100">{topic.speakingTask}</p>
         </div>
 
-        {phase === 'idle' && manualMode && (
+        {!speech.isSupported && phase === 'idle' && (
           <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-            <strong>Chrome on phone:</strong> live speech-to-text is not reliable. Use the
-            timer, speak aloud, then <strong>type your answer</strong> after you tap Stop. For
-            live captions, try <strong>Microsoft Edge</strong> on the same link.
-          </p>
-        )}
-
-        {phase === 'idle' && !manualMode && !speech.isSupported && (
-          <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-            Live captions are not supported here. Practice aloud, then type your answer.
-          </p>
-        )}
-
-        {!manualMode && speech.error && (
-          <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
-            {speech.error}
+            Speech recognition is not supported in this browser. You can still practice by
+            speaking aloud.
           </p>
         )}
 
@@ -226,28 +208,9 @@ export default function SpeakingTask() {
                 : 'text-gray-800 dark:text-gray-200'
             }`}
           >
-            {youSaidText || (showTypeBox ? 'Type your answer below.' : '')}
+            {youSaidText}
           </p>
         </div>
-
-        {showTypeBox && (
-          <div className="mb-4 rounded-2xl border border-primary/30 bg-white p-4 dark:border-primary/40 dark:bg-gray-800">
-            <label className="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100">
-              Type what you said (English)
-            </label>
-            <textarea
-              value={manualTranscript}
-              onChange={(e) => setManualTranscript(e.target.value)}
-              rows={5}
-              autoFocus
-              placeholder="Example: Hello, my name is Rahul. I am from Delhi…"
-              className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-            />
-            <Button onClick={handleSaveManual} className="mt-3" disabled={!manualTranscript.trim()}>
-              Save answer
-            </Button>
-          </div>
-        )}
 
         {!isDone && (
           <>
@@ -261,7 +224,7 @@ export default function SpeakingTask() {
                     ? 'animate-pulse bg-red-500 text-white'
                     : 'bg-primary text-white active:scale-95'
                 }`}
-                aria-label={isListening ? 'Recording' : 'Start practice'}
+                aria-label={isListening ? 'Listening' : 'Start recording'}
               >
                 {isListening ? (
                   <Square size={36} fill="currentColor" />
@@ -272,14 +235,12 @@ export default function SpeakingTask() {
               <p className="mt-4 font-mono text-lg text-gray-700 dark:text-gray-300">
                 {formatTime(seconds)} / {formatTime(MAX_SECONDS)}
               </p>
-              <p className="mt-1 px-4 text-center text-sm text-gray-500 dark:text-gray-400">
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 {isListening
-                  ? manualMode
-                    ? 'Speak now — tap Stop when finished'
-                    : 'Speak in English, then tap Stop Recording'
-                  : manualMode
-                    ? 'Tap mic to start practice timer'
-                    : 'Tap mic — allow microphone when asked'}
+                  ? mediaUnavailable
+                    ? 'Listening... (allow microphone if asked)'
+                    : 'Listening... speak in English'
+                  : 'Tap the mic to start recording'}
               </p>
             </div>
 
@@ -291,20 +252,9 @@ export default function SpeakingTask() {
           </>
         )}
 
-        {showAnswer && (
+        {isDone && (
           <div className="space-y-3">
             <Button onClick={handleTryAgain}>Try Again</Button>
-            <Button variant="outline" onClick={() => navigate('/topics')}>
-              Back to Topics
-            </Button>
-          </div>
-        )}
-
-        {showTypeBox && (
-          <div className="mt-3 space-y-3">
-            <Button variant="outline" onClick={handleTryAgain}>
-              Try Again
-            </Button>
             <Button variant="outline" onClick={() => navigate('/topics')}>
               Back to Topics
             </Button>
