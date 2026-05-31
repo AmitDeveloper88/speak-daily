@@ -29,6 +29,32 @@ function mapSpeechError(event) {
   return code ? `Speech error: ${code}` : 'Speech recognition failed. Try again.'
 }
 
+/** Chrome often sends the full phrase as interim — avoid doubling with final text. */
+export function combineFinalAndInterim(final, interim) {
+  const f = (final || '').trim()
+  const i = (interim || '').trim()
+  if (!i) return f
+  if (!f) return i
+  if (i.startsWith(f) || i.includes(f)) return i
+  return `${f} ${i}`.trim()
+}
+
+function parseResultList(results) {
+  let final = ''
+  let interim = ''
+
+  for (let i = 0; i < results.length; i++) {
+    const text = results[i][0].transcript
+    if (results[i].isFinal) {
+      final += text
+    } else {
+      interim = text
+    }
+  }
+
+  return { final, interim }
+}
+
 export function useSpeechRecognition() {
   const [isSupported, setIsSupported] = useState(false)
   const [isListening, setIsListening] = useState(false)
@@ -36,31 +62,40 @@ export function useSpeechRecognition() {
   const [interimTranscript, setInterimTranscript] = useState('')
   const [error, setError] = useState('')
   const recognitionRef = useRef(null)
-  const finalPartsRef = useRef('')
   const sessionActiveRef = useRef(false)
-  const restartTimerRef = useRef(null)
 
-  const mergeInterimIntoFinal = useCallback(() => {
-    setInterimTranscript((interim) => {
-      if (interim) {
-        const merged = `${finalPartsRef.current} ${interim}`.trim()
-        finalPartsRef.current = merged
-        setTranscript(merged)
-      }
-      return ''
-    })
-  }, [])
-
-  const clearRestartTimer = useCallback(() => {
-    if (restartTimerRef.current) {
-      clearTimeout(restartTimerRef.current)
-      restartTimerRef.current = null
+  useEffect(() => {
+    setIsSupported(isSpeechRecognitionSupported())
+    return () => {
+      sessionActiveRef.current = false
+      recognitionRef.current?.abort()
     }
   }, [])
 
-  const beginRecognition = useCallback(() => {
+  const reset = useCallback(() => {
+    sessionActiveRef.current = false
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort()
+      } catch {
+        /* already stopped */
+      }
+      recognitionRef.current = null
+    }
+    setTranscript('')
+    setInterimTranscript('')
+    setError('')
+    setIsListening(false)
+  }, [])
+
+  const start = useCallback(() => {
     const SpeechRecognition = getSpeechRecognitionConstructor()
-    if (!SpeechRecognition || !sessionActiveRef.current) return false
+    if (!SpeechRecognition) {
+      setError(
+        'Speech-to-text is not available in this browser. Type your answer after recording.'
+      )
+      return false
+    }
 
     if (recognitionRef.current) {
       try {
@@ -71,6 +106,11 @@ export function useSpeechRecognition() {
       recognitionRef.current = null
     }
 
+    sessionActiveRef.current = true
+    setTranscript('')
+    setInterimTranscript('')
+    setError('')
+
     const recognition = new SpeechRecognition()
     recognition.lang = 'en-US'
     recognition.interimResults = true
@@ -78,46 +118,27 @@ export function useSpeechRecognition() {
     recognition.maxAlternatives = 1
 
     recognition.onresult = (event) => {
-      let interim = ''
-      let finalText = finalPartsRef.current
-
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const piece = event.results[i][0].transcript
-        if (event.results[i].isFinal) {
-          finalText += piece
-        } else {
-          interim += piece
-        }
-      }
-
-      finalPartsRef.current = finalText
-      setTranscript(finalText.trim())
+      const { final, interim } = parseResultList(event.results)
+      setTranscript(final.trim())
       setInterimTranscript(interim.trim())
     }
 
     recognition.onerror = (event) => {
       const code = event?.error
-      if (sessionActiveRef.current && (code === 'no-speech' || code === 'aborted')) {
-        return
-      }
+      if (code === 'no-speech' || code === 'aborted') return
       const message = mapSpeechError(event)
       if (message) setError(message)
-      if (!sessionActiveRef.current) setIsListening(false)
     }
 
     recognition.onend = () => {
-      mergeInterimIntoFinal()
       recognitionRef.current = null
-
-      if (!sessionActiveRef.current) {
-        setIsListening(false)
-        return
+      setIsListening(false)
+      if (sessionActiveRef.current) {
+        setInterimTranscript((interim) => {
+          setTranscript((prev) => combineFinalAndInterim(prev, interim))
+          return ''
+        })
       }
-
-      clearRestartTimer()
-      restartTimerRef.current = setTimeout(() => {
-        if (sessionActiveRef.current) beginRecognition()
-      }, 280)
     }
 
     try {
@@ -126,63 +147,20 @@ export function useSpeechRecognition() {
       setIsListening(true)
       return true
     } catch {
-      if (sessionActiveRef.current) {
-        clearRestartTimer()
-        restartTimerRef.current = setTimeout(() => beginRecognition(), 400)
-      }
-      return false
-    }
-  }, [clearRestartTimer, mergeInterimIntoFinal])
-
-  useEffect(() => {
-    setIsSupported(isSpeechRecognitionSupported())
-    return () => {
       sessionActiveRef.current = false
-      clearRestartTimer()
-      recognitionRef.current?.abort()
-    }
-  }, [clearRestartTimer])
-
-  const reset = useCallback(() => {
-    sessionActiveRef.current = false
-    clearRestartTimer()
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.abort()
-      } catch {
-        /* already stopped */
-      }
-      recognitionRef.current = null
-    }
-    finalPartsRef.current = ''
-    setTranscript('')
-    setInterimTranscript('')
-    setError('')
-    setIsListening(false)
-  }, [clearRestartTimer])
-
-  const start = useCallback(() => {
-    const SpeechRecognition = getSpeechRecognitionConstructor()
-    if (!SpeechRecognition) {
-      setError(
-        'Speech-to-text is not available in this browser. On Android, try Microsoft Edge, or type what you said after recording.'
-      )
+      setError('Could not start microphone. Tap the mic again.')
+      setIsListening(false)
       return false
     }
-
-    sessionActiveRef.current = true
-    finalPartsRef.current = ''
-    setTranscript('')
-    setInterimTranscript('')
-    setError('')
-
-    return beginRecognition()
-  }, [beginRecognition])
+  }, [])
 
   const stop = useCallback(() => {
     sessionActiveRef.current = false
-    clearRestartTimer()
-    mergeInterimIntoFinal()
+
+    setInterimTranscript((interim) => {
+      setTranscript((prev) => combineFinalAndInterim(prev, interim))
+      return ''
+    })
 
     const recognition = recognitionRef.current
     if (!recognition) {
@@ -196,9 +174,9 @@ export function useSpeechRecognition() {
     }
     recognitionRef.current = null
     setIsListening(false)
-  }, [clearRestartTimer, mergeInterimIntoFinal])
+  }, [])
 
-  const liveTranscript = [transcript, interimTranscript].filter(Boolean).join(' ').trim()
+  const liveTranscript = combineFinalAndInterim(transcript, interimTranscript)
 
   return {
     isSupported,

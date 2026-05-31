@@ -174,18 +174,19 @@ export default function SpeakingTask() {
           <p className="font-medium text-gray-900 dark:text-gray-100">{topic.speakingTask}</p>
         </div>
 
-        {mobile && phase === 'idle' && (
+        {phase === 'idle' && (mobile || !speech.isSupported) && (
           <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-            On many Android phones, live speech-to-text works best in{' '}
-            <strong>Microsoft Edge</strong>. In Chrome, allow microphone, speak loudly,
-            or type your answer after you stop.
-          </p>
-        )}
-
-        {!speech.isSupported && phase === 'idle' && (
-          <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-            Live captions are not supported in this browser. You can still practice
-            aloud, then type what you said after recording.
+            {!speech.isSupported ? (
+              <>
+                Live captions are not supported here. Practice aloud, then type your
+                answer after you stop.
+              </>
+            ) : (
+              <>
+                Tip: allow microphone. On Android, <strong>Edge</strong> often works better
+                than Chrome. If text repeats or stops, tap Stop and type your answer below.
+              </>
+            )}
           </p>
         )}
 
