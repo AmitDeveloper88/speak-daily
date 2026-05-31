@@ -65,10 +65,10 @@ export default function GrammarList() {
                     {topic.title}
                   </h3>
                   {topic.subtitle && (
-                    <p className="text-sm text-gray-500 truncate dark:text-gray-400">{topic.subtitle}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{topic.subtitle}</p>
                   )}
                   {topic.tag && (
-                    <span className="mt-1 inline-block rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-green-800 dark:bg-green-950 dark:text-green-300">
+                    <span className="mt-1.5 inline-block rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-green-800 dark:bg-green-950 dark:text-green-300">
                       {topic.tag}
                     </span>
                   )}

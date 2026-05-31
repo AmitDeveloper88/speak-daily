@@ -18,7 +18,7 @@ export default function TopicCard({ topic, onClick, number }) {
           <p className="truncate text-sm text-gray-500 dark:text-gray-400">{topic.subtitle}</p>
         )}
         {topic.tag && (
-          <span className="mt-1 inline-block rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-green-800 dark:bg-green-950 dark:text-green-300">
+          <span className="mt-1.5 inline-block rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-green-800 dark:bg-green-950 dark:text-green-300">
             {topic.tag}
           </span>
         )}

@@ -5,6 +5,7 @@ export default function SentenceCard({
   number,
   hindi,
   english,
+  tag,
   showHindi = true,
   variant = 'purple',
   onClick,
@@ -51,6 +52,11 @@ export default function SentenceCard({
               <Volume2 size={18} />
             </button>
           </div>
+          {tag && (
+            <span className="mt-2 inline-block rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide text-green-800 dark:bg-green-950 dark:text-green-300">
+              {tag}
+            </span>
+          )}
         </div>
       </div>
     </Wrapper>

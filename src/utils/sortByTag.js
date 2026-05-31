@@ -38,3 +38,11 @@ export function sortSpeakingTopicsByTag(topics) {
 export function sortGrammarTopicsByTag(topics) {
   return sortByTagOrder(topics, GRAMMAR_TAG_ORDER)
 }
+
+export function sortHindiToEnglishByCategory(items) {
+  return [...items].sort((a, b) => {
+    const byCategory = (a.category || '').localeCompare(b.category || '')
+    if (byCategory !== 0) return byCategory
+    return a.id.localeCompare(b.id)
+  })
+}

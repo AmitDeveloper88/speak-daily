@@ -6,6 +6,7 @@ import Header from '../components/Header'
 import SentenceCard from '../components/SentenceCard'
 import Button from '../components/Button'
 import { hindiToEnglishPractice } from '../data/content'
+import { sortHindiToEnglishByCategory } from '../utils/sortByTag'
 
 export default function HindiToEnglish() {
   const navigate = useNavigate()
@@ -13,12 +14,15 @@ export default function HindiToEnglish() {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return hindiToEnglishPractice
-    return hindiToEnglishPractice.filter(
-      (item) =>
-        item.hindi.toLowerCase().includes(q) ||
-        item.english.toLowerCase().includes(q)
-    )
+    const list = q
+      ? hindiToEnglishPractice.filter(
+          (item) =>
+            item.hindi.toLowerCase().includes(q) ||
+            item.english.toLowerCase().includes(q) ||
+            item.category?.toLowerCase().includes(q)
+        )
+      : hindiToEnglishPractice
+    return sortHindiToEnglishByCategory(list)
   }, [query])
 
   return (
@@ -45,6 +49,7 @@ export default function HindiToEnglish() {
               number={index + 1}
               hindi={item.hindi}
               english={item.english}
+              tag={item.category}
             />
           ))}
         </div>
