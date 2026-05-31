@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   getDefaultVoiceURI,
-  getEnglishUSVoices,
+  getSelectableVoices,
   getOtherVoices,
   getRecommendedVoices,
   getVoiceLabel,
@@ -26,7 +26,7 @@ export function useVoice() {
     return () => window.removeEventListener('voicechange', onVoiceChange)
   }, [])
 
-  const voices = useMemo(() => getEnglishUSVoices(), [version])
+  const voices = useMemo(() => getSelectableVoices(), [version])
   const recommendedVoices = useMemo(() => getRecommendedVoices(), [version])
   const otherVoices = useMemo(() => getOtherVoices(), [version])
   const selectedVoice = useMemo(() => resolveVoice(), [version])
@@ -34,7 +34,7 @@ export function useVoice() {
   const naturalAvailable = useMemo(() => hasNaturalVoices(), [version])
 
   const selectVoice = useCallback((voiceURI) => {
-    setStoredVoiceURI(voiceURI)
+    setStoredVoiceURI(voiceURI, { userPick: true })
     setVersion((v) => v + 1)
   }, [])
 

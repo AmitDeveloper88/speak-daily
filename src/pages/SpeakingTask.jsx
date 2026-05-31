@@ -11,10 +11,14 @@ import {
   addRecentPractice,
   markTopicCompleted,
 } from '../utils/storage'
-import { useSpeechRecognition } from '../hooks/useSpeechRecognition'
+import {
+  isMobileBrowser,
+  useSpeechRecognition,
+} from '../hooks/useSpeechRecognition'
 
 const MAX_SECONDS = 60
 const TRANSCRIPT_DELAY_MS = 450
+const TRANSCRIPT_DELAY_MOBILE_MS = 1000
 
 function formatTime(sec) {
   const m = Math.floor(sec / 60)
@@ -24,25 +28,29 @@ function formatTime(sec) {
 
 function buildTranscriptText(speech) {
   if (!speech.isSupported) {
-    return 'Speech recognition is not supported in this browser. You can still practice by speaking aloud.'
+    return ''
   }
-  const text = (speech.transcript || speech.liveTranscript || '').trim()
-  return text || 'We could not detect your speech. Please try again.'
+  return (speech.transcript || speech.liveTranscript || '').trim()
+}
+
+function needsManualTranscript(text) {
+  return !text || text.length < 2
 }
 
 export default function SpeakingTask() {
   const { id } = useParams()
   const navigate = useNavigate()
   const topic = getTopicById(id)
+  const mobile = isMobileBrowser()
 
   const [phase, setPhase] = useState('idle')
   const [seconds, setSeconds] = useState(0)
   const [finalTranscript, setFinalTranscript] = useState('')
-  const [mediaUnavailable, setMediaUnavailable] = useState(false)
+  const [manualTranscript, setManualTranscript] = useState('')
+  const [showManualInput, setShowManualInput] = useState(false)
 
   const timerRef = useRef(null)
   const secondsRef = useRef(0)
-  const mediaRef = useRef(null)
   const speechRef = useRef(null)
 
   const speech = useSpeechRecognition()
@@ -51,7 +59,6 @@ export default function SpeakingTask() {
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
-      if (mediaRef.current?.state === 'recording') mediaRef.current.stop()
     }
   }, [])
 
@@ -72,17 +79,24 @@ export default function SpeakingTask() {
     }
   }
 
-  const stopMediaRecorder = () => {
-    if (mediaRef.current?.state === 'recording') {
-      mediaRef.current.stop()
-    }
-    mediaRef.current = null
-  }
-
   const finishRecording = () => {
     const s = speechRef.current
     if (!s) return
-    setFinalTranscript(buildTranscriptText(s))
+
+    const detected = buildTranscriptText(s)
+    const manual = manualTranscript.trim()
+
+    if (manual) {
+      setFinalTranscript(manual)
+      setShowManualInput(false)
+    } else if (needsManualTranscript(detected)) {
+      setFinalTranscript('')
+      setShowManualInput(true)
+    } else {
+      setFinalTranscript(detected)
+      setShowManualInput(false)
+    }
+
     setPhase('done')
     markTopicCompleted(topic.id)
     addRecentPractice({
@@ -93,10 +107,10 @@ export default function SpeakingTask() {
 
   const handleStop = () => {
     clearTimer()
-    stopMediaRecorder()
     speech.stop()
     if (secondsRef.current > 0) addPracticeTimeSeconds(secondsRef.current)
-    setTimeout(finishRecording, TRANSCRIPT_DELAY_MS)
+    const delay = mobile ? TRANSCRIPT_DELAY_MOBILE_MS : TRANSCRIPT_DELAY_MS
+    setTimeout(finishRecording, delay)
   }
 
   const startTimer = () => {
@@ -112,63 +126,66 @@ export default function SpeakingTask() {
     }, 1000)
   }
 
-  const startMediaRecorder = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const recorder = new MediaRecorder(stream)
-      recorder.onstop = () => stream.getTracks().forEach((t) => t.stop())
-      mediaRef.current = recorder
-      recorder.start()
-      setMediaUnavailable(false)
-    } catch {
-      setMediaUnavailable(true)
-    }
-  }
-
   const handleStart = () => {
     setFinalTranscript('')
+    setManualTranscript('')
+    setShowManualInput(false)
     setPhase('listening')
-    // Start speech sync inside tap — await breaks mic on mobile Chrome
     speech.start()
     startTimer()
-    startMediaRecorder()
   }
 
   const handleTryAgain = () => {
     clearTimer()
-    stopMediaRecorder()
     speech.reset()
     secondsRef.current = 0
     setSeconds(0)
     setFinalTranscript('')
+    setManualTranscript('')
+    setShowManualInput(false)
     setPhase('idle')
-    setMediaUnavailable(false)
+  }
+
+  const handleSaveManual = () => {
+    const text = manualTranscript.trim()
+    if (!text) return
+    setFinalTranscript(text)
+    setShowManualInput(false)
   }
 
   const isListening = phase === 'listening'
   const isDone = phase === 'done'
 
   const youSaidText = isDone
-    ? finalTranscript
+    ? finalTranscript ||
+      (showManualInput
+        ? 'Mic could not catch speech on this phone. Type what you said below.'
+        : 'We could not detect your speech. Type what you said below.')
     : isListening
-      ? speech.liveTranscript || 'Listening... start speaking'
-      : finalTranscript ||
-        'Tap the mic and speak. Your words will show here live.'
+      ? speech.liveTranscript || 'Listening… speak clearly in English'
+      : 'Tap the mic and speak. Your words will show here live.'
 
   return (
     <AppShell showNav={false}>
-      <div className="px-4 pt-1">
+      <div className="px-4 pt-1 pb-6">
         <Header title="Speaking Task" showHome />
 
         <div className="mb-4 rounded-2xl border border-blue-100 bg-blue-50 p-4 dark:border-blue-900 dark:bg-blue-950/40">
           <p className="font-medium text-gray-900 dark:text-gray-100">{topic.speakingTask}</p>
         </div>
 
+        {mobile && phase === 'idle' && (
+          <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+            On many Android phones, live speech-to-text works best in{' '}
+            <strong>Microsoft Edge</strong>. In Chrome, allow microphone, speak loudly,
+            or type your answer after you stop.
+          </p>
+        )}
+
         {!speech.isSupported && phase === 'idle' && (
           <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-            Speech-to-text may not work in Chrome on Android. Allow microphone
-            when asked, or use <strong>Microsoft Edge</strong> on your phone for
-            live captions. You can still practice by speaking aloud.
+            Live captions are not supported in this browser. You can still practice
+            aloud, then type what you said after recording.
           </p>
         )}
 
@@ -214,6 +231,24 @@ export default function SpeakingTask() {
           </p>
         </div>
 
+        {(showManualInput || (isDone && needsManualTranscript(finalTranscript))) && (
+          <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-600 dark:bg-gray-800">
+            <label className="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100">
+              Type what you said (English)
+            </label>
+            <textarea
+              value={manualTranscript}
+              onChange={(e) => setManualTranscript(e.target.value)}
+              rows={4}
+              placeholder="Type your spoken answer here…"
+              className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+            />
+            <Button onClick={handleSaveManual} className="mt-3">
+              Save answer
+            </Button>
+          </div>
+        )}
+
         {!isDone && (
           <>
             <div className="mb-4 flex flex-col items-center">
@@ -237,12 +272,10 @@ export default function SpeakingTask() {
               <p className="mt-4 font-mono text-lg text-gray-700 dark:text-gray-300">
                 {formatTime(seconds)} / {formatTime(MAX_SECONDS)}
               </p>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              <p className="mt-1 px-4 text-center text-sm text-gray-500 dark:text-gray-400">
                 {isListening
-                  ? mediaUnavailable
-                    ? 'Listening… allow mic if Chrome asked'
-                    : 'Listening… speak in English'
-                  : 'Tap mic — allow microphone when Chrome asks'}
+                  ? 'Speak in English, then tap Stop Recording'
+                  : 'Tap mic — allow microphone when asked'}
               </p>
             </div>
 
@@ -254,9 +287,20 @@ export default function SpeakingTask() {
           </>
         )}
 
-        {isDone && (
+        {isDone && !showManualInput && finalTranscript && (
           <div className="space-y-3">
             <Button onClick={handleTryAgain}>Try Again</Button>
+            <Button variant="outline" onClick={() => navigate('/topics')}>
+              Back to Topics
+            </Button>
+          </div>
+        )}
+
+        {isDone && (showManualInput || !finalTranscript) && (
+          <div className="space-y-3">
+            <Button variant="outline" onClick={handleTryAgain}>
+              Try Again
+            </Button>
             <Button variant="outline" onClick={() => navigate('/topics')}>
               Back to Topics
             </Button>

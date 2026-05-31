@@ -1,4 +1,5 @@
 const STORAGE_KEY = 'ttsVoiceURI'
+const USER_LOCKED_KEY = 'ttsVoiceUserLocked'
 const PREF_VERSION_KEY = 'ttsVoicePrefVersion'
 const PREF_VERSION = '3'
 
@@ -25,6 +26,14 @@ let voicesCache = []
 function isEnUS(voice) {
   const lang = voice.lang.toLowerCase().replace('_', '-')
   return lang === 'en-us' || lang.startsWith('en-us')
+}
+
+function isEnglishVoice(voice) {
+  return voice.lang.toLowerCase().replace('_', '-').startsWith('en')
+}
+
+export function isUserVoiceLocked() {
+  return localStorage.getItem(USER_LOCKED_KEY) === '1'
 }
 
 export function scoreVoice(voice) {
@@ -107,14 +116,22 @@ export function getEnglishUSVoices() {
   return rankVoices(voices.filter(isEnUS))
 }
 
+/** All English voices (mobile often only exposes one generic English voice). */
+export function getSelectableVoices() {
+  const voices = voicesCache.length ? voicesCache : loadVoices()
+  const english = voices.filter(isEnglishVoice)
+  const list = english.length > 0 ? english : voices
+  return rankVoices(list)
+}
+
 export function getRecommendedVoices() {
-  const ranked = getEnglishUSVoices()
+  const ranked = getSelectableVoices()
   const recommended = ranked.filter(isRecommendedVoice)
-  return recommended.length > 0 ? recommended : ranked.slice(0, 2)
+  return recommended.length > 0 ? recommended : ranked.slice(0, 3)
 }
 
 export function getOtherVoices() {
-  const ranked = getEnglishUSVoices()
+  const ranked = getSelectableVoices()
   const recommendedURIs = new Set(getRecommendedVoices().map((v) => v.voiceURI))
   return ranked.filter((v) => !recommendedURIs.has(v.voiceURI))
 }
@@ -127,9 +144,14 @@ export function getStoredVoiceURI() {
   return localStorage.getItem(STORAGE_KEY) || ''
 }
 
-export function setStoredVoiceURI(voiceURI) {
-  if (voiceURI) localStorage.setItem(STORAGE_KEY, voiceURI)
-  else localStorage.removeItem(STORAGE_KEY)
+export function setStoredVoiceURI(voiceURI, { userPick = false } = {}) {
+  if (voiceURI) {
+    localStorage.setItem(STORAGE_KEY, voiceURI)
+    if (userPick) localStorage.setItem(USER_LOCKED_KEY, '1')
+  } else {
+    localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(USER_LOCKED_KEY)
+  }
   window.dispatchEvent(new Event('voicechange'))
 }
 
@@ -146,9 +168,10 @@ export function resolveVoice() {
   const stored = getStoredVoiceURI()
   if (stored) {
     const match = voices.find((v) => v.voiceURI === stored)
-    if (match && !isLowQualityVoice(match)) return match
+    if (match && (isUserVoiceLocked() || !isLowQualityVoice(match))) return match
   }
-  return getBestNaturalVoice()
+  const best = getSelectableVoices()[0] || getBestNaturalVoice()
+  return best
 }
 
 export function getVoiceLabel(voice) {
@@ -170,8 +193,10 @@ export function getSpeechRateForVoice(voice) {
 }
 
 function applyBestVoiceIfNeeded() {
+  if (isUserVoiceLocked()) return
+
   const version = localStorage.getItem(PREF_VERSION_KEY)
-  const best = getBestNaturalVoice()
+  const best = getSelectableVoices()[0] || getBestNaturalVoice()
   if (!best) return
 
   const stored = getStoredVoiceURI()

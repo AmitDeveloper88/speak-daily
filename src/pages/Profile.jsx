@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Moon, Volume2, Check, Play, Gauge } from 'lucide-react'
 import AppShell from '../components/AppShell'
 import Header from '../components/Header'
@@ -8,6 +8,7 @@ import { useSpeechRate } from '../hooks/useSpeechRate'
 import { previewSpeech, previewVoice } from '../utils/speech'
 import { SPEECH_SPEED_OPTIONS } from '../utils/speechRate'
 import { isRecommendedVoice } from '../utils/voice'
+import { isMobileBrowser } from '../hooks/useSpeechRecognition'
 import {
   getCompletedTopics,
   getFavoriteTopics,
@@ -29,6 +30,7 @@ export default function Profile() {
     selectVoice,
   } = useVoice()
   const [voicePickerOpen, setVoicePickerOpen] = useState(false)
+  const mobile = useMemo(() => isMobileBrowser(), [])
 
   const renderVoiceRow = (voice) => {
     const isSelected = voice.voiceURI === selectedURI
@@ -188,36 +190,64 @@ export default function Profile() {
               <div className="border-t border-gray-100 bg-gray-50 px-3 py-3 dark:border-gray-700 dark:bg-gray-900/50">
                 {!naturalAvailable && (
                   <p className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-                    Best quality: open this site in <strong>Microsoft Edge</strong> and choose a voice
-                    with &quot;Natural&quot; in the name (e.g. Aria, Jenny).
+                    For more voices, open in <strong>Microsoft Edge</strong> (Natural voices). On
+                    Chrome mobile, only device voices appear.
                   </p>
                 )}
+                {voices.length <= 1 && (
+                  <p className="mb-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300">
+                    This phone has {voices.length} English voice. Change may be limited in Chrome.
+                  </p>
+                )}
+                {mobile && voices.length > 0 && (
+                  <label className="mb-3 block">
+                    <span className="mb-1 block px-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Choose voice
+                    </span>
+                    <select
+                      value={selectedURI}
+                      onChange={(e) => {
+                        selectVoice(e.target.value)
+                        previewVoice(e.target.value)
+                      }}
+                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-3 text-base text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+                    >
+                      {voices.map((voice) => (
+                        <option key={voice.voiceURI} value={voice.voiceURI}>
+                          {voice.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 <p className="mb-2 px-1 text-sm text-gray-500 dark:text-gray-400">
-                  Tap play to preview. We auto-select the best US English voice on your device.
+                  Tap play to preview. Your choice is saved on this device.
                 </p>
-                <div className="max-h-72 overflow-y-auto overscroll-contain">
-                  {voices.length === 0 && (
-                    <p className="px-2 py-3 text-sm text-gray-500 dark:text-gray-400">
-                      Loading voices… Refresh if the list stays empty.
-                    </p>
-                  )}
-                  {recommendedVoices.length > 0 && (
-                    <>
-                      <p className="mb-1 px-1 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        Recommended
+                {!mobile && (
+                  <div className="max-h-72 overflow-y-auto overscroll-contain">
+                    {voices.length === 0 && (
+                      <p className="px-2 py-3 text-sm text-gray-500 dark:text-gray-400">
+                        Loading voices… Refresh if the list stays empty.
                       </p>
-                      <ul className="mb-3 space-y-1">{recommendedVoices.map(renderVoiceRow)}</ul>
-                    </>
-                  )}
-                  {otherVoices.length > 0 && (
-                    <>
-                      <p className="mb-1 px-1 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                        More voices
-                      </p>
-                      <ul className="space-y-1">{otherVoices.map(renderVoiceRow)}</ul>
-                    </>
-                  )}
-                </div>
+                    )}
+                    {recommendedVoices.length > 0 && (
+                      <>
+                        <p className="mb-1 px-1 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                          Recommended
+                        </p>
+                        <ul className="mb-3 space-y-1">{recommendedVoices.map(renderVoiceRow)}</ul>
+                      </>
+                    )}
+                    {otherVoices.length > 0 && (
+                      <>
+                        <p className="mb-1 px-1 text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                          More voices
+                        </p>
+                        <ul className="space-y-1">{otherVoices.map(renderVoiceRow)}</ul>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </li>
