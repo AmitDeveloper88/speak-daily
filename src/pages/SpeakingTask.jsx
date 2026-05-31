@@ -11,7 +11,10 @@ import {
   addRecentPractice,
   markTopicCompleted,
 } from '../utils/storage'
-import { useSpeechRecognition } from '../hooks/useSpeechRecognition'
+import {
+  isMobileBrowser,
+  useSpeechRecognition,
+} from '../hooks/useSpeechRecognition'
 
 const MAX_SECONDS = 60
 const TRANSCRIPT_DELAY_MS = 450
@@ -113,6 +116,10 @@ export default function SpeakingTask() {
   }
 
   const startMediaRecorder = () => {
+    if (isMobileBrowser()) {
+      setMediaUnavailable(true)
+      return
+    }
     if (!navigator.mediaDevices?.getUserMedia) {
       setMediaUnavailable(true)
       return
