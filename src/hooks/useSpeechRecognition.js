@@ -1,4 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import {
+  appendSpeechSegment,
+  collapseRepeatedWords,
+  normalizeSpeechText,
+} from '../utils/speechTranscript'
 
 const FATAL_ERRORS = new Set(['not-allowed', 'service-not-allowed', 'audio-capture'])
 
@@ -39,18 +44,15 @@ function getEngineConfig(kind) {
   }
 }
 
-function liveText(finalText, interimText) {
-  const f = (finalText || '').trim()
-  const i = (interimText || '').trim()
+function formatDisplay(finalText, interimText) {
+  const f = collapseRepeatedWords(normalizeSpeechText(finalText))
+  const i = normalizeSpeechText(interimText)
   if (!i) return f
-  if (!f) return i
-  return `${f} ${i}`.trim()
-}
-
-function flushInterimIntoFinal(finalRef, interim) {
-  const piece = (interim || '').trim()
-  if (!piece) return
-  finalRef.current += piece
+  if (!f) return collapseRepeatedWords(i)
+  if (i.startsWith(f)) return collapseRepeatedWords(i)
+  if (f.endsWith(i)) return f
+  if (f.toLowerCase().includes(i.toLowerCase())) return f
+  return collapseRepeatedWords(`${f} ${i}`.trim())
 }
 
 export function useSpeechRecognition() {
@@ -63,6 +65,7 @@ export function useSpeechRecognition() {
   const shouldRunRef = useRef(false)
   const restartTimerRef = useRef(null)
   const finalRef = useRef('')
+  const lastFinalChunkRef = useRef('')
   const engineKindRef = useRef('chromium')
   const configRef = useRef(getEngineConfig('chromium'))
 
@@ -71,6 +74,14 @@ export function useSpeechRecognition() {
       clearTimeout(restartTimerRef.current)
       restartTimerRef.current = null
     }
+  }, [])
+
+  const commitFinalPiece = useCallback((piece) => {
+    const chunk = normalizeSpeechText(piece)
+    if (!chunk) return
+    if (chunk === lastFinalChunkRef.current) return
+    lastFinalChunkRef.current = chunk
+    finalRef.current = appendSpeechSegment(finalRef.current, chunk)
   }, [])
 
   const syncDisplay = useCallback((interim) => {
@@ -85,12 +96,14 @@ export function useSpeechRecognition() {
 
     restartTimerRef.current = setTimeout(() => {
       if (!shouldRunRef.current) return
+      lastFinalChunkRef.current = ''
       try {
         recognition.start()
         setIsListening(true)
       } catch {
         restartTimerRef.current = setTimeout(() => {
           if (!shouldRunRef.current) return
+          lastFinalChunkRef.current = ''
           try {
             recognition.start()
             setIsListening(true)
@@ -111,7 +124,7 @@ export function useSpeechRecognition() {
           const piece = result[0]?.transcript || ''
           if (!piece) continue
           if (result.isFinal) {
-            finalRef.current += piece
+            commitFinalPiece(piece)
           } else {
             interim += piece
           }
@@ -120,6 +133,7 @@ export function useSpeechRecognition() {
       }
 
       recognition.onend = () => {
+        lastFinalChunkRef.current = ''
         if (!shouldRunRef.current) {
           setIsListening(false)
           return
@@ -141,7 +155,7 @@ export function useSpeechRecognition() {
         if (shouldRunRef.current) scheduleRestart(recognition)
       }
     },
-    [scheduleRestart, syncDisplay],
+    [commitFinalPiece, scheduleRestart, syncDisplay],
   )
 
   const createRecognition = useCallback(() => {
@@ -190,6 +204,7 @@ export function useSpeechRecognition() {
     }
     recognitionRef.current = null
     finalRef.current = ''
+    lastFinalChunkRef.current = ''
     setTranscript('')
     setInterimTranscript('')
     setIsListening(false)
@@ -200,6 +215,7 @@ export function useSpeechRecognition() {
 
     shouldRunRef.current = true
     finalRef.current = ''
+    lastFinalChunkRef.current = ''
     setTranscript('')
     setInterimTranscript('')
     clearRestartTimer()
@@ -240,8 +256,10 @@ export function useSpeechRecognition() {
     clearRestartTimer()
 
     setInterimTranscript((interim) => {
-      flushInterimIntoFinal(finalRef, interim)
-      setTranscript(finalRef.current.trim())
+      if (interim.trim()) {
+        finalRef.current = appendSpeechSegment(finalRef.current, interim)
+      }
+      setTranscript(collapseRepeatedWords(finalRef.current.trim()))
       return ''
     })
 
@@ -265,7 +283,7 @@ export function useSpeechRecognition() {
     isListening,
     transcript: transcript.trim(),
     interimTranscript,
-    liveTranscript: liveText(transcript, interimTranscript),
+    liveTranscript: formatDisplay(transcript, interimTranscript),
     start,
     stop,
     reset,

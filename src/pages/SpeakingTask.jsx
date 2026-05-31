@@ -244,9 +244,7 @@ export default function SpeakingTask() {
               </p>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 {isListening
-                  ? mediaUnavailable
-                    ? 'Listening… keep speaking, short pauses are OK'
-                    : 'Listening… keep speaking, short pauses are OK'
+                  ? 'Listening… keep going; short pauses are OK. To start over, tap Try Again.'
                   : 'Tap the mic to start recording'}
               </p>
             </div>
