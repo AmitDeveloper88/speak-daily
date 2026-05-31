@@ -16,7 +16,6 @@ import { dedupeSpokenText } from '../utils/transcript'
 
 const MAX_SECONDS = 60
 const TRANSCRIPT_DELAY_MS = 450
-const TRANSCRIPT_DELAY_MOBILE_MS = 1000
 
 function formatTime(sec) {
   const m = Math.floor(sec / 60)
@@ -25,14 +24,10 @@ function formatTime(sec) {
 }
 
 function buildTranscriptText(speech) {
-  if (!speech.isSupported) {
+  if (!speech.isSupported || speech.manualPractice) {
     return ''
   }
   return dedupeSpokenText(speech.transcript || speech.liveTranscript || '')
-}
-
-function needsManualTranscript(text) {
-  return !text || text.length < 2
 }
 
 export default function SpeakingTask() {
@@ -44,7 +39,6 @@ export default function SpeakingTask() {
   const [seconds, setSeconds] = useState(0)
   const [finalTranscript, setFinalTranscript] = useState('')
   const [manualTranscript, setManualTranscript] = useState('')
-  const [showManualInput, setShowManualInput] = useState(false)
 
   const timerRef = useRef(null)
   const secondsRef = useRef(0)
@@ -52,6 +46,7 @@ export default function SpeakingTask() {
 
   const speech = useSpeechRecognition()
   speechRef.current = speech
+  const manualMode = speech.manualPractice
 
   useEffect(() => {
     return () => {
@@ -76,40 +71,46 @@ export default function SpeakingTask() {
     }
   }
 
-  const finishRecording = () => {
-    const s = speechRef.current
-    if (!s) return
-
-    const detected = buildTranscriptText(s)
-    const manual = manualTranscript.trim()
-
-    if (manual) {
-      setFinalTranscript(manual)
-      setShowManualInput(false)
-    } else if (needsManualTranscript(detected)) {
-      setFinalTranscript('')
-      setShowManualInput(true)
-    } else {
-      setFinalTranscript(detected)
-      setShowManualInput(false)
-    }
-
+  const completePractice = (answerText) => {
+    setFinalTranscript(answerText)
     setPhase('done')
     markTopicCompleted(topic.id)
-    addRecentPractice({
-      id: topic.id,
-      title: topic.title,
-    })
+    addRecentPractice({ id: topic.id, title: topic.title })
+  }
+
+  const finishRecording = () => {
+    const s = speechRef.current
+    const typed = manualTranscript.trim()
+
+    if (manualMode || !s?.isSupported) {
+      completePractice(typed)
+      return
+    }
+
+    const detected = buildTranscriptText(s)
+    if (typed) {
+      completePractice(typed)
+    } else if (detected) {
+      completePractice(detected)
+    } else {
+      setFinalTranscript('')
+      setPhase('done')
+      markTopicCompleted(topic.id)
+      addRecentPractice({ id: topic.id, title: topic.title })
+    }
   }
 
   const handleStop = () => {
     clearTimer()
     speech.stop()
     if (secondsRef.current > 0) addPracticeTimeSeconds(secondsRef.current)
-    const delay = speechRef.current?.isMobileMode
-      ? TRANSCRIPT_DELAY_MOBILE_MS
-      : TRANSCRIPT_DELAY_MS
-    setTimeout(finishRecording, delay)
+
+    if (manualMode) {
+      finishRecording()
+      return
+    }
+
+    setTimeout(finishRecording, TRANSCRIPT_DELAY_MS)
   }
 
   const startTimer = () => {
@@ -128,7 +129,6 @@ export default function SpeakingTask() {
   const handleStart = () => {
     setFinalTranscript('')
     setManualTranscript('')
-    setShowManualInput(false)
     setPhase('listening')
     speech.start()
     startTimer()
@@ -141,30 +141,29 @@ export default function SpeakingTask() {
     setSeconds(0)
     setFinalTranscript('')
     setManualTranscript('')
-    setShowManualInput(false)
     setPhase('idle')
   }
 
   const handleSaveManual = () => {
     const text = manualTranscript.trim()
     if (!text) return
-    setFinalTranscript(text)
-    setShowManualInput(false)
+    completePractice(text)
   }
 
   const isListening = phase === 'listening'
   const isDone = phase === 'done'
+  const showTypeBox = isDone && (manualMode || !finalTranscript)
+  const showAnswer = isDone && finalTranscript && !showTypeBox
 
   const youSaidText = isDone
-    ? finalTranscript ||
-      (showManualInput
-        ? 'Mic could not catch speech on this phone. Type what you said below.'
-        : 'We could not detect your speech. Type what you said below.')
+    ? finalTranscript
     : isListening
-      ? speech.isMobileMode
-        ? 'Recording… speak in English. Tap Stop when finished.'
+      ? manualMode
+        ? 'Speak aloud in English. Timer is running — type your answer after Stop.'
         : speech.liveTranscript || 'Listening… speak clearly in English'
-      : 'Tap the mic and speak. Your words will show here live.'
+      : manualMode
+        ? 'Tap mic to start the timer. Speak, then type what you said.'
+        : 'Tap the mic and speak. Your words will show here live.'
 
   return (
     <AppShell showNav={false}>
@@ -175,23 +174,21 @@ export default function SpeakingTask() {
           <p className="font-medium text-gray-900 dark:text-gray-100">{topic.speakingTask}</p>
         </div>
 
-        {phase === 'idle' && (speech.isMobileMode || !speech.isSupported) && (
+        {phase === 'idle' && manualMode && (
           <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-            {!speech.isSupported ? (
-              <>
-                Live captions are not supported here. Practice aloud, then type your
-                answer after you stop.
-              </>
-            ) : (
-              <>
-                Tip: allow microphone. On Android, <strong>Edge</strong> often works better
-                than Chrome. If text repeats or stops, tap Stop and type your answer below.
-              </>
-            )}
+            <strong>Chrome on phone:</strong> live speech-to-text is not reliable. Use the
+            timer, speak aloud, then <strong>type your answer</strong> after you tap Stop. For
+            live captions, try <strong>Microsoft Edge</strong> on the same link.
           </p>
         )}
 
-        {speech.error && (
+        {phase === 'idle' && !manualMode && !speech.isSupported && (
+          <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+            Live captions are not supported here. Practice aloud, then type your answer.
+          </p>
+        )}
+
+        {!manualMode && speech.error && (
           <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
             {speech.error}
           </p>
@@ -229,23 +226,24 @@ export default function SpeakingTask() {
                 : 'text-gray-800 dark:text-gray-200'
             }`}
           >
-            {youSaidText}
+            {youSaidText || (showTypeBox ? 'Type your answer below.' : '')}
           </p>
         </div>
 
-        {(showManualInput || (isDone && needsManualTranscript(finalTranscript))) && (
-          <div className="mb-4 rounded-2xl border border-gray-200 bg-white p-4 dark:border-gray-600 dark:bg-gray-800">
+        {showTypeBox && (
+          <div className="mb-4 rounded-2xl border border-primary/30 bg-white p-4 dark:border-primary/40 dark:bg-gray-800">
             <label className="mb-2 block text-sm font-semibold text-gray-900 dark:text-gray-100">
               Type what you said (English)
             </label>
             <textarea
               value={manualTranscript}
               onChange={(e) => setManualTranscript(e.target.value)}
-              rows={4}
-              placeholder="Type your spoken answer here…"
+              rows={5}
+              autoFocus
+              placeholder="Example: Hello, my name is Rahul. I am from Delhi…"
               className="w-full resize-none rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-base text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
             />
-            <Button onClick={handleSaveManual} className="mt-3">
+            <Button onClick={handleSaveManual} className="mt-3" disabled={!manualTranscript.trim()}>
               Save answer
             </Button>
           </div>
@@ -263,7 +261,7 @@ export default function SpeakingTask() {
                     ? 'animate-pulse bg-red-500 text-white'
                     : 'bg-primary text-white active:scale-95'
                 }`}
-                aria-label={isListening ? 'Listening' : 'Start recording'}
+                aria-label={isListening ? 'Recording' : 'Start practice'}
               >
                 {isListening ? (
                   <Square size={36} fill="currentColor" />
@@ -276,8 +274,12 @@ export default function SpeakingTask() {
               </p>
               <p className="mt-1 px-4 text-center text-sm text-gray-500 dark:text-gray-400">
                 {isListening
-                  ? 'Speak in English, then tap Stop Recording'
-                  : 'Tap mic — allow microphone when asked'}
+                  ? manualMode
+                    ? 'Speak now — tap Stop when finished'
+                    : 'Speak in English, then tap Stop Recording'
+                  : manualMode
+                    ? 'Tap mic to start practice timer'
+                    : 'Tap mic — allow microphone when asked'}
               </p>
             </div>
 
@@ -289,7 +291,7 @@ export default function SpeakingTask() {
           </>
         )}
 
-        {isDone && !showManualInput && finalTranscript && (
+        {showAnswer && (
           <div className="space-y-3">
             <Button onClick={handleTryAgain}>Try Again</Button>
             <Button variant="outline" onClick={() => navigate('/topics')}>
@@ -298,8 +300,8 @@ export default function SpeakingTask() {
           </div>
         )}
 
-        {isDone && (showManualInput || !finalTranscript) && (
-          <div className="space-y-3">
+        {showTypeBox && (
+          <div className="mt-3 space-y-3">
             <Button variant="outline" onClick={handleTryAgain}>
               Try Again
             </Button>
