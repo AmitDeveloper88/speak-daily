@@ -125,12 +125,13 @@ export default function SpeakingTask() {
     }
   }
 
-  const handleStart = async () => {
+  const handleStart = () => {
     setFinalTranscript('')
     setPhase('listening')
-    await startMediaRecorder()
+    // Start speech sync inside tap — await breaks mic on mobile Chrome
     speech.start()
     startTimer()
+    startMediaRecorder()
   }
 
   const handleTryAgain = () => {
@@ -165,8 +166,15 @@ export default function SpeakingTask() {
 
         {!speech.isSupported && phase === 'idle' && (
           <p className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
-            Speech recognition is not supported in this browser. You can still
-            practice by speaking aloud.
+            Speech-to-text may not work in Chrome on Android. Allow microphone
+            when asked, or use <strong>Microsoft Edge</strong> on your phone for
+            live captions. You can still practice by speaking aloud.
+          </p>
+        )}
+
+        {speech.error && (
+          <p className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200">
+            {speech.error}
           </p>
         )}
 
@@ -232,9 +240,9 @@ export default function SpeakingTask() {
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 {isListening
                   ? mediaUnavailable
-                    ? 'Listening... (mic only for practice)'
-                    : 'Listening...'
-                  : 'Tap the mic to start recording'}
+                    ? 'Listening… allow mic if Chrome asked'
+                    : 'Listening… speak in English'
+                  : 'Tap mic — allow microphone when Chrome asks'}
               </p>
             </div>
 

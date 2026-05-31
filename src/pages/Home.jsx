@@ -59,7 +59,7 @@ export default function Home() {
         )}
 
         <h2 className="mt-6 mb-3 text-xl font-bold text-gray-900 dark:text-gray-100">Categories</h2>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <CategoryCard
             compact
             accent="purple"

@@ -9,11 +9,32 @@ export function isSpeechRecognitionSupported() {
   return !!getSpeechRecognitionConstructor()
 }
 
+function isMobileBrowser() {
+  if (typeof navigator === 'undefined') return false
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+}
+
+function mapSpeechError(event) {
+  const code = event?.error
+  if (code === 'not-allowed' || code === 'service-not-allowed') {
+    return 'Microphone blocked. Allow mic for this site in Chrome settings.'
+  }
+  if (code === 'no-speech') {
+    return 'No speech heard. Speak closer to the mic and try again.'
+  }
+  if (code === 'network') {
+    return 'Speech recognition needs internet. Check your connection.'
+  }
+  if (code === 'aborted') return ''
+  return code ? `Speech error: ${code}` : 'Speech recognition failed. Try again.'
+}
+
 export function useSpeechRecognition() {
   const [isSupported, setIsSupported] = useState(false)
   const [isListening, setIsListening] = useState(false)
   const [transcript, setTranscript] = useState('')
   const [interimTranscript, setInterimTranscript] = useState('')
+  const [error, setError] = useState('')
   const recognitionRef = useRef(null)
   const finalPartsRef = useRef('')
 
@@ -36,12 +57,18 @@ export function useSpeechRecognition() {
     finalPartsRef.current = ''
     setTranscript('')
     setInterimTranscript('')
+    setError('')
     setIsListening(false)
   }, [])
 
   const start = useCallback(() => {
     const SpeechRecognition = getSpeechRecognitionConstructor()
-    if (!SpeechRecognition) return false
+    if (!SpeechRecognition) {
+      setError(
+        'Speech-to-text is not available in this browser. On Android, try Microsoft Edge, or practice by speaking aloud.'
+      )
+      return false
+    }
 
     if (recognitionRef.current) {
       try {
@@ -53,11 +80,14 @@ export function useSpeechRecognition() {
     finalPartsRef.current = ''
     setTranscript('')
     setInterimTranscript('')
+    setError('')
 
     const recognition = new SpeechRecognition()
-    recognition.lang = 'en-IN'
+    const mobile = isMobileBrowser()
+    recognition.lang = mobile ? 'en-US' : 'en-IN'
     recognition.interimResults = true
-    recognition.continuous = true
+    recognition.continuous = !mobile
+    recognition.maxAlternatives = 1
 
     recognition.onresult = (event) => {
       let interim = ''
@@ -77,7 +107,9 @@ export function useSpeechRecognition() {
       setInterimTranscript(interim.trim())
     }
 
-    recognition.onerror = () => {
+    recognition.onerror = (event) => {
+      const message = mapSpeechError(event)
+      if (message) setError(message)
       setIsListening(false)
     }
 
@@ -99,6 +131,7 @@ export function useSpeechRecognition() {
       setIsListening(true)
       return true
     } catch {
+      setError('Could not start microphone. Tap the mic again.')
       setIsListening(false)
       return false
     }
@@ -127,6 +160,7 @@ export function useSpeechRecognition() {
     transcript: transcript.trim(),
     interimTranscript,
     liveTranscript,
+    error,
     start,
     stop,
     reset,
